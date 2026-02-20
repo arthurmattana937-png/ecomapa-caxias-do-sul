@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoMapa Caxias do Sul</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; font-family: 'Segoe UI', sans-serif; background: #fff; }
+        #map { height: 100vh; width: 100%; z-index: 1; }
+        .menu-toggle {
+            position: absolute; top: 15px; left: 15px; z-index: 1100;
+            background: #2ecc71; color: white; border: none;
+            width: 50px; height: 50px; border-radius: 50%;
+            font-size: 24px; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .panel {
+            position: absolute; top: 0; left: -280px; z-index: 1200;
+            background: white; width: 260px; height: 100vh;
+            box-shadow: 2px 0 15px rgba(0,0,0,0.2); transition: 0.3s;
+        }
+        .panel.active { left: 0; }
+        .logo-container {
+            width: 100%; height: 120px; background: #fff;
+            display: flex; align-items: center; justify-content: center;
+            border-bottom: 1px solid #eee; position: relative;
+        }
+        .logo-container img { max-width: 80%; max-height: 80%; object-fit: contain; }
+        .close-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 20px; cursor: pointer; color: #888; }
+        .panel-content { padding: 20px; }
+        h2 { margin: 0 0 15px 0; font-size: 18px; color: #2c3e50; text-align: center; }
+        .filter-group { display: flex; flex-direction: column; gap: 12px; }
+        .filter-item { display: flex; align-items: center; cursor: pointer; font-size: 14px; }
+        .filter-item input { margin-right: 12px; transform: scale(1.2); }
+        .blob { width: 14px; height: 14px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .eletronico { background: #e74c3c; } 
+        .geral { background: #795548; }      
+        .seletiva { background: #2ecc71; }   
+        .oleo { background: #f1c40f; }       
+        .volumosos { background: #e67e22; }  
+        .about-btn { background: #3498db; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; margin-top: 20px; width: 100%; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.6); }
+        .modal-content { background-color: white; margin: 15% auto; padding: 25px; border-radius: 15px; width: 85%; max-width: 400px; text-align: center; line-height: 1.6; }
+        .modal-close { background: #e74c3c; color: white; border: none; padding: 10px 20px; border-radius: 5px; margin-top: 15px; cursor: pointer; }
+        footer { text-align: center; font-size: 10px; color: #aaa; padding: 20px 0; }
+    </style>
+</head>
+<body>
+
+    <button class="menu-toggle" id="btnOpen">☰</button>
+
+    <div class="panel" id="sidePanel">
+        <div class="logo-container">
+            <button class="close-btn" id="btnClose">✕</button>
+            <img src="1771610947980.png" alt="EcoMapa Logo">
+        </div>
+        <div class="panel-content">
+            <h2>Onde descartar?</h2>
+            <div class="filter-group">
+                <label class="filter-item"><input type="checkbox" checked id="check-eletronico"> <span class="blob eletronico"></span> Eletrônicos</label>
+                <label class="filter-item"><input type="checkbox" checked id="check-geral"> <span class="blob geral"></span> Coleta Orgânica</label>
+                <label class="filter-item"><input type="checkbox" checked id="check-seletiva"> <span class="blob seletiva"></span> Coleta Seletiva</label>
+                <label class="filter-item"><input type="checkbox" checked id="check-oleo"> <span class="blob oleo"></span> Óleo de Cozinha</label>
+                <label class="filter-item"><input type="checkbox" checked id="check-volumosos"> <span class="blob volumosos"></span> Móveis/Volumosos</label>
+                <button class="about-btn" id="btnAbout">Sobre o Projeto</button>
+            </div>
+        </div>
+        <footer>EcoMapa Caxias do Sul - RS</footer>
+    </div>
+
+    <div id="aboutModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: #2ecc71;">Sobre o Projeto</h3>
+            <p><strong>Criadores do site:</strong> Arthur Biazus Mattana e Júlia Camila dos Santos.</p>
+            <p>Este site foi criado com o intuito de facilitar o encontro de diversos pontos de coleta diferentes na cidade. A ideia surgiu através do projeto extensionista da Faculdade Cruzeiro do Sul, com o tema Sustentabilidade e Inovação.</p>
+            <button class="modal-close" id="btnCloseModal">Fechar</button>
+        </div>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const panel = document.getElementById('sidePanel');
+        const modal = document.getElementById('aboutModal');
+        document.getElementById('btnOpen').onclick = () => panel.classList.add('active');
+        document.getElementById('btnClose').onclick = () => panel.classList.remove('active');
+        document.getElementById('btnAbout').onclick = () => modal.style.display = "block";
+        document.getElementById('btnCloseModal').onclick = () => modal.style.display = "none";
+
+        var map = L.map('map').setView([-29.168, -51.179], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        var layers = {
+            eletronico: L.layerGroup().addTo(map),
+            geral: L.layerGroup().addTo(map),
+            seletiva: L.layerGroup().addTo(map),
+            oleo: L.layerGroup().addTo(map),
+            volumosos: L.layerGroup().addTo(map)
+        };
+
+        function addPoint(layer, lat, lng, nome, bairro, endereco, hSegSex, hFimSem, cor) {
+            var content = `<b>${nome}</b><br><span style="color: #666;">Bairro: ${bairro}</span><br><small>${endereco}</small><br><br><b>Segunda a Sexta:</b> ${hSegSex}<br><b>Sábados/Domingos:</b> ${hFimSem}`;
+            L.circleMarker([lat, lng], { radius: 10, fillColor: cor, color: "#fff", weight: 2, fillOpacity: 0.9 }).addTo(layers[layer]).bindPopup(content);
+        }
+
+        addPoint('eletronico', -29.1438, -51.1915, 'AMBE Resíduos', 'Cinquentenário', 'R. Prof. Marcos Martini, 1215', '08h às 17h', 'Fechado', '#e74c3c');
+        addPoint('eletronico', -29.1650, -51.1790, 'UERGS Caxias', 'Centro', 'Rua Bento Gonçalves, 2163', '09h às 21h', 'Fechado', '#e74c3c');
+        addPoint('oleo', -29.1678, -51.1795, 'Zaffari Centro', 'Centro', 'Rua Sinimbu, 1310', '08h às 21h', 'Dom: 09h às 20h', '#f1c40f');
+        addPoint('oleo', -29.1780, -51.1850, 'Andreazza Shopping', 'Villagio Iguatemi', 'R. Guerino Sanvitto, 755', '09h às 22h', 'Sáb/Dom: 09h às 22h', '#f1c40f');
+        addPoint('volumosos', -29.1480, -51.1505, 'Ecoponto Codeca', 'Centenário', 'RSC-453 (Anexo Codeca)', '08h às 17h', 'Sáb: 08h às 12h', '#e67e22');
+        addPoint('seletiva', -29.1912, -51.2185, 'Assoc. Novo Amanhã', 'Desvio Rizzo', 'Rua Luiza Bedin, 182', '07:30 às 17:30', 'Fechado', '#2ecc71');
+        addPoint('seletiva', -29.1380, -51.1720, 'Coop. Força da Unidade', 'Santa Fé', 'Rua dos Torneadores, 120', '08h às 18h', 'Fechado', '#2ecc71');
+        addPoint('geral', -29.1485, -51.1510, 'CODECA Sede', 'Centenário', 'Rua RS-122, Km 69', '24 Horas', '24 Horas', '#795548');
+
+        function setupFilter(id, layerName) {
+            document.getElementById(id).onchange = function() {
+                if (this.checked) map.addLayer(layers[layerName]);
+                else map.removeLayer(layers[layerName]);
+            };
+        }
+        setupFilter('check-eletronico', 'eletronico');
+        setupFilter('check-geral', 'geral');
+        setupFilter('check-seletiva', 'seletiva');
+        setupFilter('check-oleo', 'oleo');
+        setupFilter('check-volumosos', 'volumosos');
+    </script>
+</body>
+</html>
